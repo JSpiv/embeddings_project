@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Recurse \"C:\\\\Users\\\\jspiv\\\\Documents\\\\embeddings_project\" | Where-Object { -not $_.PSIsContainer } | Select-Object -ExpandProperty FullName | Sort-Object)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\jspiv\\\\Documents\\\\embeddings_project\" -Recurse | Where-Object { -not $_.PSIsContainer } | Select-Object FullName | Sort-Object FullName)",
+      "Bash(find /mnt/c/Users/jspiv/Documents/embeddings_project -type f | sort)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\jspiv\\\\Documents\\\\embeddings_project\" -Recurse -File | ForEach-Object { $_.FullName })",
+      "PowerShell(Rename-Item \"C:\\\\Users\\\\jspiv\\\\Documents\\\\embeddings_project\\\\frontend\\\\next.config.ts\" \"next.config.mjs\")"
+    ]
+  }
+}

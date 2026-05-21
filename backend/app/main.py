@@ -1,0 +1,90 @@
+import uuid
+import shutil
+from pathlib import Path
+
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.config import TMP_DIR
+from app.schemas import UploadResponse, ProcessResponse, Point
+from app.biology.bio_io import load_csv, load_h5ad, SUPPORTED_EXTENSIONS
+from app.biology.bio_clean import clean_bio_dataframe
+from app.biology.scanpy_pipeline import run_scanpy_embedding, run_scanpy_embedding_from_adata
+from app.biology.clustering import kmeans_cluster
+from app.projections.registry import PROJECTORS
+
+app = FastAPI(title="Embeddings API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
+@app.post("/upload", response_model=UploadResponse)
+async def upload_file(file: UploadFile = File(...)):
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in SUPPORTED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type. Supported: {sorted(SUPPORTED_EXTENSIONS)}",
+        )
+
+    file_id = str(uuid.uuid4())
+    dest = TMP_DIR / f"{file_id}{suffix}"
+    with dest.open("wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    return UploadResponse(file_id=file_id)
+
+
+@app.post("/process", response_model=ProcessResponse)
+async def process_file(
+    file_id: str = Form(...),
+    projection_method: str = Form(...),
+    n_clusters: int = Form(8),
+):
+    if projection_method not in PROJECTORS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown projection method. Choose from: {list(PROJECTORS.keys())}",
+        )
+
+    # Find the uploaded file regardless of extension
+    matches = list(TMP_DIR.glob(f"{file_id}.*"))
+    if not matches:
+        raise HTTPException(status_code=404, detail="File not found")
+    file_path = matches[0]
+
+    try:
+        ext = file_path.suffix.lower()
+        if ext == ".h5ad":
+            adata = load_h5ad(file_path)
+            pca_embedding, metadata_df = run_scanpy_embedding_from_adata(adata)
+            cleaning_report: dict = {"source": "h5ad", "shape": list(adata.shape)}
+        else:
+            df = load_csv(file_path)
+            cleaned_matrix, metadata_df, cleaning_report = clean_bio_dataframe(df)
+            pca_embedding = run_scanpy_embedding(cleaned_matrix)
+
+        cluster_labels = kmeans_cluster(pca_embedding, n_clusters=n_clusters)
+        projector = PROJECTORS[projection_method]
+        coords = projector(pca_embedding)
+
+        points = []
+        for i, row in enumerate(coords):
+            x, y, z = float(row[0]), float(row[1]), float(row[2])
+            cell_id = str(metadata_df.index[i]) if i < len(metadata_df) else f"cell_{i}"
+            meta = metadata_df.iloc[i].to_dict() if i < len(metadata_df) else {}
+            points.append(Point(id=cell_id, x=x, y=y, z=z, cluster=int(cluster_labels[i]), metadata=meta))
+
+        return ProcessResponse(points=points, cleaning_report=cleaning_report)
+    finally:
+        file_path.unlink(missing_ok=True)

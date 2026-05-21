@@ -1,0 +1,23 @@
+# Environment variables — never commit these
+.env
+.env.*
+!.env.example
+
+# Backend
+backend/tmp/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.venv/
+.uv/
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.pnpm-store/
+
+# OS
+.DS_Store
+Thumbs.db
