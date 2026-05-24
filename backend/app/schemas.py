@@ -16,19 +16,19 @@ class Point(BaseModel):
 
 
 class ProcessResponse(BaseModel):
-    model_id: str | None = None
     points: list[Point]
     cleaning_report: dict[str, Any]
 
 
-class SavedModel(BaseModel):
+class SharedDataset(BaseModel):
     id: str
     name: str
+    description: str | None
     projection_method: str
     n_clusters: int
     created_at: str
 
 
-class SavedModelDetail(SavedModel):
+class SharedDatasetDetail(SharedDataset):
     points: list[Point]
     cleaning_report: dict[str, Any]

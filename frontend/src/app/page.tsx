@@ -5,9 +5,9 @@ import dynamic from "next/dynamic";
 import UploadPanel from "@/components/UploadPanel";
 import ProjectionControls from "@/components/ProjectionControls";
 import PointInspector from "@/components/PointInspector";
-import SavedModels from "@/components/SavedModels";
+import SharedDatasets from "@/components/SharedDatasets";
 import { processFile } from "@/lib/api";
-import type { Point, SavedModelDetail } from "@/lib/types";
+import type { Point, SharedDatasetDetail } from "@/lib/types";
 
 const EmbeddingMap = dynamic(() => import("@/components/EmbeddingMap"), { ssr: false });
 
@@ -52,10 +52,10 @@ export default function Home() {
     }
   }
 
-  function handleLoadModel(model: SavedModelDetail) {
-    applyPoints(model.points);
-    setProjection(model.projection_method);
-    setNClusters(model.n_clusters);
+  function handleLoadDataset(dataset: SharedDatasetDetail) {
+    applyPoints(dataset.points);
+    setProjection(dataset.projection_method);
+    setNClusters(dataset.n_clusters);
   }
 
   return (
@@ -77,8 +77,8 @@ export default function Home() {
         />
         {error && <p className="text-sm text-red-500">{error}</p>}
         <div className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium text-gray-700">Saved Models</h2>
-          <SavedModels onLoad={handleLoadModel} />
+          <h2 className="text-sm font-medium text-gray-700">Datasets</h2>
+          <SharedDatasets onLoad={handleLoadDataset} />
         </div>
       </aside>
 

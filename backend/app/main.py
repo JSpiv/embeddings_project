@@ -1,18 +1,17 @@
 import uuid
-import shutil
 from pathlib import Path
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import TMP_DIR, MAX_UPLOAD_BYTES, MAX_CELLS
-from app.schemas import UploadResponse, ProcessResponse, Point, SavedModel, SavedModelDetail
+from app.schemas import UploadResponse, ProcessResponse, Point, SharedDataset, SharedDatasetDetail
 from app.biology.bio_io import load_csv, load_h5ad, SUPPORTED_EXTENSIONS
 from app.biology.bio_clean import clean_bio_dataframe
 from app.biology.scanpy_pipeline import run_scanpy_embedding, run_scanpy_embedding_from_adata
 from app.biology.clustering import kmeans_cluster
 from app.projections.registry import PROJECTORS
-from app.storage.models_repo import save_model, list_models, get_model, delete_model
+from app.storage.datasets_repo import list_datasets, get_dataset
 
 app = FastAPI(title="Embeddings API")
 
@@ -22,9 +21,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Track original filenames for saving to Supabase
-_pending_filenames: dict[str, str] = {}
 
 
 @app.get("/health")
@@ -45,14 +41,12 @@ async def upload_file(file: UploadFile = File(...)):
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(
             status_code=413,
-            detail=f"File too large. Maximum upload size for processing is {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.",
+            detail=f"File too large. User uploads are limited to {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.",
         )
 
     file_id = str(uuid.uuid4())
     dest = TMP_DIR / f"{file_id}{suffix}"
     dest.write_bytes(content)
-
-    _pending_filenames[file_id] = file.filename or file_id
     return UploadResponse(file_id=file_id)
 
 
@@ -80,7 +74,7 @@ async def process_file(
             if adata.n_obs > MAX_CELLS:
                 raise HTTPException(
                     status_code=422,
-                    detail=f"Dataset has {adata.n_obs:,} cells. Processing is limited to {MAX_CELLS:,} cells. Load a pre-processed model from Supabase instead.",
+                    detail=f"Dataset has {adata.n_obs:,} cells. User uploads are limited to {MAX_CELLS:,} cells. Use a shared dataset instead.",
                 )
             pca_embedding, metadata_df = run_scanpy_embedding_from_adata(adata)
             cleaning_report: dict = {"source": "h5ad", "shape": list(adata.shape)}
@@ -89,7 +83,7 @@ async def process_file(
             if len(df) > MAX_CELLS:
                 raise HTTPException(
                     status_code=422,
-                    detail=f"Dataset has {len(df):,} rows. Processing is limited to {MAX_CELLS:,} cells.",
+                    detail=f"Dataset has {len(df):,} rows. User uploads are limited to {MAX_CELLS:,} cells.",
                 )
             cleaned_matrix, metadata_df, cleaning_report = clean_bio_dataframe(df)
             pca_embedding = run_scanpy_embedding(cleaned_matrix)
@@ -105,47 +99,25 @@ async def process_file(
             meta = metadata_df.iloc[i].to_dict() if i < len(metadata_df) else {}
             points.append(Point(id=cell_id, x=x, y=y, z=z, cluster=int(cluster_labels[i]), metadata=meta))
 
-        # Save to Supabase
-        model_id: str | None = None
-        try:
-            filename = _pending_filenames.pop(file_id, file_id)
-            model_id = save_model(
-                name=filename,
-                projection_method=projection_method,
-                n_clusters=n_clusters,
-                points=points,
-                cleaning_report=cleaning_report,
-            )
-        except Exception:
-            pass  # Supabase unavailable — still return results
-
-        return ProcessResponse(model_id=model_id, points=points, cleaning_report=cleaning_report)
+        return ProcessResponse(points=points, cleaning_report=cleaning_report)
     finally:
         file_path.unlink(missing_ok=True)
 
 
-@app.get("/models", response_model=list[SavedModel])
-async def get_models():
+@app.get("/datasets", response_model=list[SharedDataset])
+async def get_datasets():
     try:
-        return list_models()
+        return list_datasets()
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Storage unavailable: {e}")
 
 
-@app.get("/models/{model_id}", response_model=SavedModelDetail)
-async def get_model_by_id(model_id: str):
+@app.get("/datasets/{dataset_id}", response_model=SharedDatasetDetail)
+async def get_dataset_by_id(dataset_id: str):
     try:
-        data = get_model(model_id)
+        data = get_dataset(dataset_id)
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Storage unavailable: {e}")
     if not data:
-        raise HTTPException(status_code=404, detail="Model not found")
+        raise HTTPException(status_code=404, detail="Dataset not found")
     return data
-
-
-@app.delete("/models/{model_id}", status_code=204)
-async def delete_model_by_id(model_id: str):
-    try:
-        delete_model(model_id)
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Storage unavailable: {e}")

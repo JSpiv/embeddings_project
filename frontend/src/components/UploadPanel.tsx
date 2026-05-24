@@ -48,7 +48,7 @@ export default function UploadPanel({ onUpload, fileId }: Props) {
         onChange={handleChange}
       />
       <p className="text-xs text-gray-400">
-        CSV or H5AD · max 500 MB upload · 50,000 cell processing limit
+        CSV or H5AD · max 50 MB · 10,000 cells
       </p>
       {fileName && fileId && (
         <p className="text-xs text-green-600 truncate">{fileName}</p>

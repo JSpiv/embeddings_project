@@ -1,4 +1,4 @@
-import type { ProcessResponse, SavedModel, SavedModelDetail } from "./types";
+import type { ProcessResponse, SharedDataset, SharedDatasetDetail } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -31,18 +31,14 @@ export async function processFile(
   return res.json() as Promise<ProcessResponse>;
 }
 
-export async function listModels(): Promise<SavedModel[]> {
-  const res = await fetch(`${API_BASE}/models`);
-  if (!res.ok) throw new Error("Failed to load models");
-  return res.json() as Promise<SavedModel[]>;
+export async function listDatasets(): Promise<SharedDataset[]> {
+  const res = await fetch(`${API_BASE}/datasets`);
+  if (!res.ok) throw new Error("Failed to load datasets");
+  return res.json() as Promise<SharedDataset[]>;
 }
 
-export async function loadModel(modelId: string): Promise<SavedModelDetail> {
-  const res = await fetch(`${API_BASE}/models/${modelId}`);
-  if (!res.ok) throw new Error("Failed to load model");
-  return res.json() as Promise<SavedModelDetail>;
-}
-
-export async function deleteModel(modelId: string): Promise<void> {
-  await fetch(`${API_BASE}/models/${modelId}`, { method: "DELETE" });
+export async function loadDataset(datasetId: string): Promise<SharedDatasetDetail> {
+  const res = await fetch(`${API_BASE}/datasets/${datasetId}`);
+  if (!res.ok) throw new Error("Failed to load dataset");
+  return res.json() as Promise<SharedDatasetDetail>;
 }
