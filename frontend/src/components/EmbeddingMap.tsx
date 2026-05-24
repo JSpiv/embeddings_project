@@ -3,10 +3,10 @@
 import { useState, useMemo, useEffect } from "react";
 import DeckGL from "@deck.gl/react";
 import { OrbitView, COORDINATE_SYSTEM } from "@deck.gl/core";
-import { PointCloudLayer } from "@deck.gl/layers";
+import { PointCloudLayer, TextLayer } from "@deck.gl/layers";
 import type { Point } from "@/lib/types";
 
-const CLUSTER_COLORS: [number, number, number, number][] = [
+const PALETTE: [number, number, number, number][] = [
   [99,  132, 255, 220],
   [255,  99, 132, 220],
   [75,  192, 132, 220],
@@ -44,10 +44,12 @@ interface NormalizedPoint extends Point {
 
 interface Props {
   points: Point[];
+  colorBy: string;
   onPointClick: (point: Point) => void;
+  onFallback?: () => void;
 }
 
-export default function EmbeddingMap({ points, onPointClick }: Props) {
+export default function EmbeddingMap({ points, colorBy, onPointClick, onFallback }: Props) {
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
 
   useEffect(() => {
@@ -76,27 +78,101 @@ export default function EmbeddingMap({ points, onPointClick }: Props) {
     }));
   }, [points]);
 
-  const layer = new PointCloudLayer<NormalizedPoint>({
+  // Build value→color map for metadata column, falling back to clusters if column is empty
+  const { valueColorMap, usingFallback } = useMemo(() => {
+    if (colorBy === "clusters") {
+      return { valueColorMap: null, usingFallback: false };
+    }
+    const values = normalized.map((p) => p.metadata[colorBy]);
+    const hasData = values.some((v) => v !== null && v !== undefined && v !== "");
+    if (!hasData) {
+      onFallback?.();
+      return { valueColorMap: null, usingFallback: true };
+    }
+    const unique = Array.from(new Set(values.map(String)));
+    const map: Record<string, [number, number, number, number]> = {};
+    unique.forEach((v, i) => { map[v] = PALETTE[i % PALETTE.length]; });
+    return { valueColorMap: map, usingFallback: false };
+  }, [normalized, colorBy, onFallback]);
+
+  const getColor = (p: NormalizedPoint): [number, number, number, number] => {
+    if (valueColorMap) {
+      const v = String(p.metadata[colorBy] ?? "");
+      return valueColorMap[v] ?? PALETTE[0];
+    }
+    return PALETTE[p.cluster % PALETTE.length];
+  };
+
+  const getLabel = (p: NormalizedPoint): string => {
+    if (valueColorMap) return String(p.metadata[colorBy] ?? "");
+    return `Cluster ${p.cluster}`;
+  };
+
+  // Centroids keyed by label value
+  const centroids = useMemo(() => {
+    const sums: Record<string, [number, number, number, number]> = {};
+    for (const p of normalized) {
+      const key = getLabel(p);
+      if (!sums[key]) sums[key] = [0, 0, 0, 0];
+      sums[key][0] += p.position[0];
+      sums[key][1] += p.position[1];
+      sums[key][2] += p.position[2];
+      sums[key][3]++;
+    }
+    return Object.entries(sums).map(([label, [sx, sy, sz, count]]) => ({
+      label,
+      position: [sx / count, sy / count, sz / count] as [number, number, number],
+    }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalized, colorBy, valueColorMap]);
+
+  const pointLayer = new PointCloudLayer<NormalizedPoint>({
     id: "embedding",
     data: normalized,
     coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
     getPosition: (d) => d.position,
-    getColor: (d) => CLUSTER_COLORS[d.cluster % CLUSTER_COLORS.length],
+    getColor: (d) => getColor(d),
     pointSize: 2,
     pickable: true,
     onClick: ({ object }) => object && onPointClick(object),
+    updateTriggers: { getColor: [colorBy, valueColorMap] },
+  });
+
+  const labelLayer = new TextLayer({
+    id: "labels",
+    data: centroids,
+    coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
+    getPosition: (d) => d.position,
+    getText: (d) => d.label,
+    getColor: [30, 30, 30, 220],
+    getSize: 14,
+    getTextAnchor: "middle",
+    getAlignmentBaseline: "center",
+    fontWeight: 600,
+    background: true,
+    getBackgroundColor: [255, 255, 255, 180],
+    backgroundPadding: [4, 2, 4, 2],
+    pickable: false,
+    updateTriggers: { getText: [colorBy, valueColorMap] },
   });
 
   return (
-    <DeckGL
-      views={new OrbitView({ orbitAxis: "Y" })}
-      viewState={viewState}
-      onViewStateChange={({ viewState: vs }) =>
-        setViewState(vs as typeof INITIAL_VIEW_STATE)
-      }
-      layers={[layer]}
-      controller
-      style={{ width: "100%", height: "100%" }}
-    />
+    <div className="w-full h-full relative">
+      {usingFallback && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs px-3 py-1.5 rounded-full pointer-events-none">
+          No data for selected column — showing k-means clusters
+        </div>
+      )}
+      <DeckGL
+        views={new OrbitView({ orbitAxis: "Y" })}
+        viewState={viewState}
+        onViewStateChange={({ viewState: vs }) =>
+          setViewState(vs as typeof INITIAL_VIEW_STATE)
+        }
+        layers={[pointLayer, labelLayer]}
+        controller
+        style={{ width: "100%", height: "100%" }}
+      />
+    </div>
   );
 }

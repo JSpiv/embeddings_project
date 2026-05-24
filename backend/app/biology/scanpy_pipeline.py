@@ -13,7 +13,11 @@ def run_scanpy_embedding(feature_df: pd.DataFrame) -> np.ndarray:
 
 
 def run_scanpy_embedding_from_adata(adata: ad.AnnData) -> tuple[np.ndarray, pd.DataFrame]:
-    # Densify sparse matrices
+    # If PCA already exists (pre-processed file), use it directly
+    if "X_pca" in adata.obsm:
+        return adata.obsm["X_pca"], adata.obs.copy()
+
+    # Densify sparse matrices before running pipeline
     if issparse(adata.X):
         adata.X = adata.X.toarray()
     adata.X = adata.X.astype(np.float32)

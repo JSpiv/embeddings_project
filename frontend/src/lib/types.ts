@@ -8,6 +8,20 @@ export interface Point {
 }
 
 export interface ProcessResponse {
+  model_id: string | null;
+  points: Point[];
+  cleaning_report: Record<string, unknown>;
+}
+
+export interface SavedModel {
+  id: string;
+  name: string;
+  projection_method: string;
+  n_clusters: number;
+  created_at: string;
+}
+
+export interface SavedModelDetail extends SavedModel {
   points: Point[];
   cleaning_report: Record<string, unknown>;
 }

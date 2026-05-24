@@ -1,4 +1,4 @@
-import type { ProcessResponse } from "./types";
+import type { ProcessResponse, SavedModel, SavedModelDetail } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -29,4 +29,20 @@ export async function processFile(
     throw new Error(err.detail ?? "Processing failed");
   }
   return res.json() as Promise<ProcessResponse>;
+}
+
+export async function listModels(): Promise<SavedModel[]> {
+  const res = await fetch(`${API_BASE}/models`);
+  if (!res.ok) throw new Error("Failed to load models");
+  return res.json() as Promise<SavedModel[]>;
+}
+
+export async function loadModel(modelId: string): Promise<SavedModelDetail> {
+  const res = await fetch(`${API_BASE}/models/${modelId}`);
+  if (!res.ok) throw new Error("Failed to load model");
+  return res.json() as Promise<SavedModelDetail>;
+}
+
+export async function deleteModel(modelId: string): Promise<void> {
+  await fetch(`${API_BASE}/models/${modelId}`, { method: "DELETE" });
 }
