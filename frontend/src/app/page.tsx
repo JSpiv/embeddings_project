@@ -24,7 +24,7 @@ export default function Home() {
   const [points, setPoints] = useState<Point[]>([]);
   const [selectedPoint, setSelectedPoint] = useState<Point | null>(null);
   const [projection, setProjection] = useState<string>("umap");
-  const [nClusters, setNClusters] = useState<number>(8);
+  const [nClusters, setNClusters] = useState<number>(6);
   const [colorBy, setColorBy] = useState<string>("clusters");
   const [metadataColumns, setMetadataColumns] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
