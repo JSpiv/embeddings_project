@@ -9,20 +9,28 @@ def run_scanpy_embedding(feature_df: pd.DataFrame) -> np.ndarray:
     adata = ad.AnnData(X=feature_df.values.astype(np.float32))
     adata.obs_names = [str(i) for i in feature_df.index]
     adata.var_names = [str(c) for c in feature_df.columns]
-    return _run_pipeline(adata)
+    latent = _run_pipeline(adata)
+    return latent
 
 
 def run_scanpy_embedding_from_adata(adata: ad.AnnData) -> tuple[np.ndarray, pd.DataFrame]:
-    # If PCA already exists (pre-processed file), use it directly
-    if "X_pca" in adata.obsm:
-        return adata.obsm["X_pca"], adata.obs.copy()
+    obs = adata.obs.copy()  # preserve metadata labels (louvain, cell_type, etc.)
 
-    # Densify sparse matrices before running pipeline
-    if issparse(adata.X):
-        adata.X = adata.X.toarray()
-    adata.X = adata.X.astype(np.float32)
-    pca = _run_pipeline(adata)
-    return pca, adata.obs.copy()
+    if adata.raw is None:
+        raise ValueError(
+            "adata.raw is not available. H5AD files must contain raw counts in adata.raw "
+            "to ensure the pipeline runs on unprocessed data."
+        )
+
+    working = adata.raw.to_adata()
+    working.obs = obs
+
+    if issparse(working.X):
+        working.X = working.X.toarray()
+    working.X = working.X.astype(np.float32)
+
+    latent = _run_pipeline(working)
+    return latent, obs
 
 
 def _run_pipeline(adata: ad.AnnData) -> np.ndarray:
@@ -42,6 +50,6 @@ def _run_pipeline(adata: ad.AnnData) -> np.ndarray:
     n_comps = min(50, adata.n_vars - 1, num_cells - 1)
     if n_comps < 1:
         n_comps = 1
-    sc.tl.pca(adata, n_comps=n_comps)
+    sc.tl.pca(adata, n_comps=n_comps, key_added="X_latent")
 
-    return adata.obsm["X_pca"]
+    return adata.obsm["X_latent"]

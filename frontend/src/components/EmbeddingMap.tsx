@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import DeckGL from "@deck.gl/react";
 import { OrbitView, COORDINATE_SYSTEM } from "@deck.gl/core";
-import { PointCloudLayer, TextLayer } from "@deck.gl/layers";
+import { PointCloudLayer, TextLayer, LineLayer } from "@deck.gl/layers";
 import type { Point } from "@/lib/types";
 
 const PALETTE: [number, number, number, number][] = [
@@ -138,6 +138,40 @@ export default function EmbeddingMap({ points, colorBy, onPointClick, onFallback
     updateTriggers: { getColor: [colorBy, valueColorMap] },
   });
 
+  const AXIS_LENGTH = 220;
+  const axisLayer = new LineLayer({
+    id: "axes",
+    coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
+    data: [
+      { from: [-AXIS_LENGTH, 0, 0], to: [AXIS_LENGTH, 0, 0], color: [220, 60, 60, 200] },
+      { from: [0, -AXIS_LENGTH, 0], to: [0, AXIS_LENGTH, 0], color: [60, 180, 60, 200] },
+      { from: [0, 0, -AXIS_LENGTH], to: [0, 0, AXIS_LENGTH], color: [60, 60, 220, 200] },
+    ],
+    getSourcePosition: (d) => d.from,
+    getTargetPosition: (d) => d.to,
+    getColor: (d) => d.color,
+    getWidth: 1,
+    pickable: false,
+  });
+
+  const axisLabelLayer = new TextLayer({
+    id: "axis-labels",
+    coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
+    data: [
+      { position: [AXIS_LENGTH + 15, 0, 0], text: "X", color: [220, 60, 60, 220] },
+      { position: [0, AXIS_LENGTH + 15, 0], text: "Y", color: [60, 180, 60, 220] },
+      { position: [0, 0, AXIS_LENGTH + 15], text: "Z", color: [60, 60, 220, 220] },
+    ],
+    getPosition: (d) => d.position,
+    getText: (d) => d.text,
+    getColor: (d) => d.color,
+    getSize: 14,
+    fontWeight: 700,
+    getTextAnchor: "middle",
+    getAlignmentBaseline: "center",
+    pickable: false,
+  });
+
   const labelLayer = new TextLayer({
     id: "labels",
     data: centroids,
@@ -169,7 +203,7 @@ export default function EmbeddingMap({ points, colorBy, onPointClick, onFallback
         onViewStateChange={({ viewState: vs }) =>
           setViewState(vs as typeof INITIAL_VIEW_STATE)
         }
-        layers={[pointLayer, labelLayer]}
+        layers={[axisLayer, axisLabelLayer, pointLayer, labelLayer]}
         controller
         style={{ width: "100%", height: "100%" }}
       />

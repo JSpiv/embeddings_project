@@ -50,7 +50,7 @@ export default function ProjectionControls({
         <input
           type="range"
           min={2}
-          max={20}
+          max={6}
           value={nClusters}
           onChange={(e) => onNClustersChange(Number(e.target.value))}
           className="w-full accent-gray-900"

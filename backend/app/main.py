@@ -76,7 +76,10 @@ async def process_file(
                     status_code=422,
                     detail=f"Dataset has {adata.n_obs:,} cells. User uploads are limited to {MAX_CELLS:,} cells. Use a shared dataset instead.",
                 )
-            pca_embedding, metadata_df = run_scanpy_embedding_from_adata(adata)
+            try:
+                latent_embedding, metadata_df = run_scanpy_embedding_from_adata(adata)
+            except ValueError as e:
+                raise HTTPException(status_code=422, detail=str(e))
             cleaning_report: dict = {"source": "h5ad", "shape": list(adata.shape)}
         else:
             df = load_csv(file_path)
@@ -86,11 +89,11 @@ async def process_file(
                     detail=f"Dataset has {len(df):,} rows. User uploads are limited to {MAX_CELLS:,} cells.",
                 )
             cleaned_matrix, metadata_df, cleaning_report = clean_bio_dataframe(df)
-            pca_embedding = run_scanpy_embedding(cleaned_matrix)
+            latent_embedding = run_scanpy_embedding(cleaned_matrix)
 
-        cluster_labels = kmeans_cluster(pca_embedding, n_clusters=n_clusters)
+        cluster_labels = kmeans_cluster(latent_embedding, n_clusters=n_clusters)
         projector = PROJECTORS[projection_method]
-        coords = projector(pca_embedding)
+        coords = projector(latent_embedding)
 
         points = []
         for i, row in enumerate(coords):

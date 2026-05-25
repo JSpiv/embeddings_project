@@ -6,7 +6,8 @@
       "Bash(find /mnt/c/Users/jspiv/Documents/embeddings_project -type f | sort)",
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\jspiv\\\\Documents\\\\embeddings_project\" -Recurse -File | ForEach-Object { $_.FullName })",
       "PowerShell(Rename-Item \"C:\\\\Users\\\\jspiv\\\\Documents\\\\embeddings_project\\\\frontend\\\\next.config.ts\" \"next.config.mjs\")",
-      "PowerShell(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\jspiv\\\\Documents\\\\embeddings_project\\\\backend\\\\scripts\")"
+      "PowerShell(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\jspiv\\\\Documents\\\\embeddings_project\\\\backend\\\\scripts\")",
+      "Bash(npx tsc *)"
     ]
   }
 }
