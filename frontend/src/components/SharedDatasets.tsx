@@ -12,61 +12,60 @@ interface Props {
 
 export default function SharedDatasets({ projection, nClusters, onLoad }: Props) {
   const [datasets, setDatasets] = useState<SharedDataset[]>([]);
+  const [selected, setSelected] = useState<string>("");
   const [loading, setLoading] = useState(true);
-  const [loadingName, setLoadingName] = useState<string | null>(null);
+  const [loadingNow, setLoadingNow] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     listDatasets()
-      .then(setDatasets)
+      .then((data) => {
+        setDatasets(data);
+        if (data.length > 0) setSelected(data[0].name);
+      })
       .catch(() => setError("Storage unavailable"))
       .finally(() => setLoading(false));
   }, []);
 
-  // Deduplicate by name — keep first occurrence (most recent)
-  const uniqueDatasets = datasets.filter(
-    (d, i, arr) => arr.findIndex((x) => x.name === d.name) === i
-  );
+  // Unique names only
+  const uniqueNames = [...new Set(datasets.map((d) => d.name))];
 
-  async function handleLoad(name: string, description: string | null) {
-    setLoadingName(name);
+  async function handleLoad() {
+    if (!selected) return;
+    setLoadingNow(true);
     setError(null);
     try {
-      const dataset = await lookupDataset(name, projection, nClusters);
+      const dataset = await lookupDataset(selected, projection, nClusters);
       onLoad(dataset);
     } catch {
-      setError(`No "${name}" entry for ${projection.toUpperCase()} k=${nClusters}`);
+      setError(`No entry for ${projection.toUpperCase()} k=${nClusters}`);
     } finally {
-      setLoadingName(null);
+      setLoadingNow(false);
     }
   }
 
   if (loading) return <p className="text-xs text-gray-400">Loading datasets…</p>;
-  if (error) return (
-    <div className="flex flex-col gap-2">
-      <p className="text-xs text-red-400">{error}</p>
-    </div>
-  );
-  if (uniqueDatasets.length === 0) return <p className="text-xs text-gray-400">No shared datasets available</p>;
+  if (uniqueNames.length === 0 && !error) return <p className="text-xs text-gray-400">No shared datasets available</p>;
 
   return (
     <div className="flex flex-col gap-2">
-      {uniqueDatasets.map((d) => (
-        <div key={d.name} className="border border-gray-200 rounded p-2 flex flex-col gap-1">
-          <p className="text-xs font-medium">{d.name}</p>
-          {d.description && (
-            <p className="text-xs text-gray-400 leading-snug">{d.description}</p>
-          )}
-          <p className="text-xs text-gray-400">{projection.toUpperCase()} · k={nClusters}</p>
-          <button
-            onClick={() => handleLoad(d.name, d.description)}
-            disabled={loadingName === d.name}
-            className="mt-1 w-full rounded bg-gray-900 px-2 py-1 text-xs text-white hover:bg-gray-700 disabled:opacity-40"
-          >
-            {loadingName === d.name ? "Loading…" : "Load"}
-          </button>
-        </div>
-      ))}
+      <select
+        value={selected}
+        onChange={(e) => setSelected(e.target.value)}
+        className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+      >
+        {uniqueNames.map((name) => (
+          <option key={name} value={name}>{name}</option>
+        ))}
+      </select>
+      <button
+        onClick={handleLoad}
+        disabled={loadingNow || !selected}
+        className="w-full rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition disabled:opacity-40"
+      >
+        {loadingNow ? "Loading…" : "Load"}
+      </button>
+      {error && <p className="text-xs text-red-400">{error}</p>}
     </div>
   );
 }
