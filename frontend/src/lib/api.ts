@@ -42,3 +42,18 @@ export async function loadDataset(datasetId: string): Promise<SharedDatasetDetai
   if (!res.ok) throw new Error("Failed to load dataset");
   return res.json() as Promise<SharedDatasetDetail>;
 }
+
+export async function lookupDataset(
+  name: string,
+  projectionMethod: string,
+  nClusters: number
+): Promise<SharedDatasetDetail> {
+  const params = new URLSearchParams({
+    name,
+    projection_method: projectionMethod,
+    n_clusters: String(nClusters),
+  });
+  const res = await fetch(`${API_BASE}/datasets/lookup/by-params?${params}`);
+  if (!res.ok) throw new Error("No dataset found for these parameters");
+  return res.json() as Promise<SharedDatasetDetail>;
+}

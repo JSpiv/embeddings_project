@@ -18,6 +18,9 @@ frontend/.next/
 frontend/out/
 frontend/.pnpm-store/
 
+# Claude
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db

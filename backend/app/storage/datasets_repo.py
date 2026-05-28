@@ -40,6 +40,20 @@ def list_datasets() -> list[dict[str, Any]]:
     return result.data
 
 
+def lookup_dataset(name: str, projection_method: str, n_clusters: int) -> dict[str, Any] | None:
+    client = get_client()
+    result = (
+        client.table(TABLE)
+        .select("*")
+        .eq("name", name)
+        .eq("projection_method", projection_method)
+        .eq("n_clusters", n_clusters)
+        .single()
+        .execute()
+    )
+    return result.data
+
+
 def get_dataset(dataset_id: str) -> dict[str, Any] | None:
     client = get_client()
     result = (

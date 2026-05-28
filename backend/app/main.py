@@ -11,7 +11,7 @@ from app.biology.bio_clean import clean_bio_dataframe
 from app.biology.scanpy_pipeline import run_scanpy_embedding, run_scanpy_embedding_from_adata
 from app.biology.clustering import kmeans_cluster
 from app.projections.registry import PROJECTORS
-from app.storage.datasets_repo import list_datasets, get_dataset
+from app.storage.datasets_repo import list_datasets, get_dataset, lookup_dataset
 
 app = FastAPI(title="Embeddings API")
 
@@ -123,4 +123,15 @@ async def get_dataset_by_id(dataset_id: str):
         raise HTTPException(status_code=503, detail=f"Storage unavailable: {e}")
     if not data:
         raise HTTPException(status_code=404, detail="Dataset not found")
+    return data
+
+
+@app.get("/datasets/lookup/by-params", response_model=SharedDatasetDetail)
+async def lookup_dataset_by_params(name: str, projection_method: str, n_clusters: int):
+    try:
+        data = lookup_dataset(name, projection_method, n_clusters)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Storage unavailable: {e}")
+    if not data:
+        raise HTTPException(status_code=404, detail="No dataset found for these parameters")
     return data

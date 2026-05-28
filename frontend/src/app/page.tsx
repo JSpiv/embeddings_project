@@ -78,7 +78,11 @@ export default function Home() {
         {error && <p className="text-sm text-red-500">{error}</p>}
         <div className="flex flex-col gap-2">
           <h2 className="text-sm font-medium text-gray-700">Datasets</h2>
-          <SharedDatasets onLoad={handleLoadDataset} />
+          <SharedDatasets
+            projection={projection}
+            nClusters={nClusters}
+            onLoad={handleLoadDataset}
+          />
         </div>
       </aside>
 
